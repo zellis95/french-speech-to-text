@@ -6,13 +6,15 @@ Experimentation pipeline comparing CTC baseline vs LLM-adapter ASR on French, fo
 
 ## Architecture
 
+Two independent experiments, both using the same frozen encoder:
+
 ```
-                        CTC Experiment              LLM Experiment
-                        ──────────────              ──────────────
-Audio (16kHz) ──► mHuBERT-147 (frozen) ──► Linear(768,45) ──► CTC Loss
-                        │
-                        └──► Adapter (trainable) ──► Qwen2.5-0.5B (frozen) ──► CE Loss
-                             ConcatMLP / ConvMLP       (inputs_embeds)
+CTC Experiment:
+  Audio (16kHz) ──► mHuBERT-147 (frozen) ──► Linear(768, 45) ──► CTC Loss
+
+LLM Experiment:
+  Audio (16kHz) ──► mHuBERT-147 (frozen) ──► Adapter (trainable) ──► Qwen2.5-0.5B (frozen) ──► CE Loss
+                                              ConcatMLP / ConvMLP     (inputs_embeds)
 ```
 
 ## Setup
@@ -35,9 +37,11 @@ echo "HF_TOKEN=hf_your_token_here" > .env
 | [MLS French](https://huggingface.co/datasets/facebook/multilingual_librispeech) | Read audiobooks (scripted) | dev | 2,416 | ~10h |
 | MLS French | Read audiobooks (scripted) | test | 2,426 | ~10h |
 | MLS French | Read audiobooks (scripted) | train | 258,213 | ~1,077h |
-| [SPS Corpus](data/sps-corpus-3.0-2026-03-09-fr/) | Spontaneous speech | — | 152 | ~0.6h |
+| [SPS Corpus](https://datacollective.mozillafoundation.org/datasets/cmmytgij900f2nz07xm0wyzrd) | Spontaneous speech | — | 152 | ~0.6h |
 
 Two test sets: scripted (in-distribution MLS) and spontaneous (out-of-distribution SPS) to measure generalisation.
+
+MLS is CC-BY-4.0. SPS (Common Voice Spontaneous Speech 3.0) is CC0-1.0 but prohibits redistribution and speaker identification attempts — data is gitignored, not included in this repo.
 
 ## Usage
 
