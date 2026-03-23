@@ -1,3 +1,4 @@
+# Environment
 .env
 *.env
 *.env.local
@@ -5,4 +6,27 @@
 *.env.test.local
 *.env.production.local
 
+# Claude
 .claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Data & models (large files)
+/data/
+/checkpoints/
+
+# Experiment outputs
+outputs/
+multirun/
+wandb/
+
+# Reference materials
+*.pdf
+gemini-further-chat.md
+
+# OS
+.DS_Store
