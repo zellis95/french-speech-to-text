@@ -1,0 +1,9 @@
+name: mls
+dataset: facebook/multilingual_librispeech
+language: french
+# Default splits — overridden by mode/local.yaml or mode/remote.yaml
+train_split: "dev"
+val_split: "dev"
+test_split: "test"
+max_duration_s: 15.0
+num_workers: 0

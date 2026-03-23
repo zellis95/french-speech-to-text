@@ -1,0 +1,2 @@
+name: llm_${adapter.name}
+type: llm

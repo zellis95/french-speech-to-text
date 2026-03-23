@@ -1,0 +1,26 @@
+defaults:
+  - experiment: ctc_baseline
+  - adapter: concat_mlp
+  - training: ctc
+  - data@data: mls
+  - data@sps: sps
+  - mode: local
+  - _self_
+
+hydra:
+  job:
+    chdir: false
+
+device: auto
+seed: 42
+run_name: ${experiment.name}_lr${training.lr}
+
+encoder:
+  name: utter-project/mHuBERT-147
+  hidden_dim: 768
+
+llm:
+  name: Qwen/Qwen2.5-0.5B-Instruct
+  hidden_dim: 896
+  dtype: float16
+  prompt: "Transcrivez la parole en texte."

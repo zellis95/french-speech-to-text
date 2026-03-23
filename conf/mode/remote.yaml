@@ -1,0 +1,10 @@
+# @package _global_
+# Real training on Modal GPU — full train split pre-cached on Modal Volume
+# train: 258,213 samples, ~17GB, ~1,077h audio
+data:
+  train_split: "train"
+  val_split: "dev"
+training:
+  epochs: 30
+  early_stopping_patience: 3
+  batch_size: 4

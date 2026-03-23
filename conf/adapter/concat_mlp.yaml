@@ -1,0 +1,6 @@
+name: concat_mlp
+concat_k: 5
+hidden_dims: [2048]
+output_dim: ${llm.hidden_dim}
+dropout: 0.1
+activation: relu
