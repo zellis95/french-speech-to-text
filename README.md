@@ -90,3 +90,7 @@ tests/                  Unit tests (pytest)
 
 - **Local** (`mode=local`): MPS backend, MLS `dev` split for training, `test` for validation. Intended for smoke testing and fast iteration — not for producing final results. Swap to `mode=remote` or download the full train split for real training runs.
 - **Remote** (`mode=remote`): Modal serverless GPU (L4/T4), full MLS `train` split pre-cached on Modal Volume, `dev` for validation, W&B logging.
+
+## Status
+
+Training pipeline complete (CTC + LLM adapter). Next: Modal integration for remote GPU training, then run experiments.

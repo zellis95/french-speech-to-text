@@ -59,10 +59,7 @@ class MLSDataset(Dataset):
         # Filter using audio_duration column — batch read, no per-row indexing
         durations = ds["audio_duration"]
         total = len(durations)
-        self._valid_indices = [
-            i for i, d in enumerate(durations)
-            if d <= max_duration_s
-        ]
+        self._valid_indices = [i for i, d in enumerate(durations) if d <= max_duration_s]
         skipped = total - len(self._valid_indices)
         if skipped:
             log.info(f"MLSDataset: filtered {skipped}/{total} clips exceeding {max_duration_s}s")
@@ -74,8 +71,8 @@ class MLSDataset(Dataset):
     def __len__(self) -> int:
         return len(self._valid_indices)
 
-    def __getitem__(self, idx: int) -> dict:
-        row = self._ds[self._valid_indices[idx]]
+    def __getitem__(self, index: int) -> dict:
+        row = self._ds[self._valid_indices[index]]
         audio = row["audio"]
         waveform = torch.tensor(audio["array"], dtype=torch.float32)
         sr = audio["sampling_rate"]
@@ -138,8 +135,8 @@ class SPSDataset(Dataset):
             )
         return self._resampler_cache[orig_sr]
 
-    def __getitem__(self, idx: int) -> dict:
-        entry = self._entries[idx]
+    def __getitem__(self, index: int) -> dict:
+        entry = self._entries[index]
         audio_path = self._audio_dir / entry["audio_file"]
 
         waveform, sr = torchaudio.load(audio_path)

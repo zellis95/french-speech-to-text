@@ -67,6 +67,17 @@ conf/
 - `.env` file has `HF_TOKEN` (needed for HF downloads)
 - Load with `from dotenv import load_dotenv; load_dotenv()` in entry points
 
+## Code Quality
+
+- **Linting/formatting**: `uv run ruff check src/ scripts/ tests/` and `uv run ruff format src/ scripts/ tests/`
+- **Type checking**: `uv run ty check src/`
+- **Tests**: `uv run pytest tests/`
+- Run all three before committing. Ruff config in pyproject.toml (line-length=100, py313).
+
+## Observations
+
+Log interesting findings in `observations.md` — things spotted during development, experiments, unexpected model behaviours, etc.
+
 ## Gotchas
 
 - **MLS downloads**: Do NOT use `load_dataset("facebook/multilingual_librispeech", "french", split="dev")` — this downloads ALL splits (~17GB). Use targeted parquet `data_files` approach in `MLSDataset`.
