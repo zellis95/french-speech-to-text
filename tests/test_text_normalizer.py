@@ -1,18 +1,15 @@
 """Tests for French text normalization and CTC charset."""
 
-import pytest
-
 from src.data.text_normalizer import (
+    CHAR_TO_IDX,
     CTC_BLANK,
     CTC_CHARS,
     CTC_VOCAB_SIZE,
-    CHAR_TO_IDX,
     IDX_TO_CHAR,
     decode_ctc_indices,
     encode_for_ctc,
     normalize_text,
 )
-
 
 # --- CTC charset ---
 
@@ -205,7 +202,8 @@ class TestEdgeCases:
         text = "Ma préoccupation, c'est qu'on devient trop dépendant des téléphones portables"
         result = normalize_text(text)
         # Should be lowercase, no punctuation, accents preserved
-        assert result == "ma préoccupation c'est qu'on devient trop dépendant des téléphones portables"
+        expected = "ma préoccupation c'est qu'on devient trop dépendant des téléphones portables"
+        assert result == expected
         # Should encode/decode cleanly
         indices = encode_for_ctc(result)
         assert decode_ctc_indices(indices) == result
