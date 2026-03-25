@@ -80,3 +80,23 @@ The adapter has shifted from the pre-training behaviour (Chinese text / prompt p
 - **Pretraining artefacts**: markdown image links, random English — the LLM's prior dominates over the weak audio signal from 6 gradient updates.
 
 With proper training (more data, more epochs), the adapter should learn to map audio features to the text embedding space, steering the LLM toward French transcription.
+
+## LLM adapter with more data: French emerges! (2026-03-25)
+
+1 epoch on ~300 MLS samples (max_duration=12s), ConcatMLP adapter. Decoded 5 test samples:
+
+```
+[0] hyp: ![](https://i.imgur.com/7ZJzQWu.png)          ← still imgur markdown
+[2] hyp: compartment, container, receptacle, receptivity... ← English thesaurus mode
+[3] hyp: ixi i xixi i xixi i xixi i xixi...              ← rhythmic repetition
+[4] hyp: -C'est une phrase en français.                   ← ACTUAL FRENCH!
+```
+
+Sample 4 produces French: "C'est une phrase en français" = "It's a sentence in French." However, the prompt itself is in French ("Transcrivez la parole en texte"), so the LLM has a strong hint to respond in French regardless of what the adapter feeds it. This is more likely the LLM following instruction language than the adapter having learned anything meaningful about the audio content. The real signal would be output that matches the *content* of the audio, not just the language.
+
+Still, the progression from Chinese/English to French output is interesting — fewer pretraining artefacts, more prompt-following:
+1. **Random adapter**: Chinese text / prompt parroting (LLM's strongest prior)
+2. **6 weight updates** (103 samples): English patterns, markdown, repetition loops
+3. **~38 weight updates** (300 samples, 1 epoch): Mix of English artefacts + French appearing
+
+Memory note: this run hit ~20GB during epoch 2, forcing a kill. Data preprocessing (48kHz→16kHz one-off) is essential before longer training runs on MPS.
