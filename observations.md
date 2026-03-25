@@ -37,3 +37,19 @@ pred: errrreerrrrrrr
 ```
 
 Meanwhile the reference transcripts are beautiful French sentences like "Quand il pleut j'aime bien prendre un poncho plutôt qu'un parapluie..." — the contrast is very funny. CTC is notoriously slow to start producing readable text — it first needs to learn the blank/space structure before actual characters emerge. The smooth loss curve confirms the pipeline is working correctly; it just needs more training to get past the "errrrr" phase.
+
+## CTC checkpoint decode: full garbage after 2 epochs on MLS dev (2026-03-25)
+
+Ran 2 epochs of CTC training on the full MLS dev split (1,220 samples, batch_size=2, lr=3e-4). Loss went from ~11.7 → ~10.5 (train) and val_loss=8.68. WER=1.0072 (>100%), CER=0.75.
+
+Loaded the epoch 2 checkpoint and decoded 5 test samples:
+
+```
+[0] ref: la nuit suivante appela sa soeur quand il en fut temps si vous ne dormez pas
+    hyp: aqêêxgêêgêgêgêêûêûêûêûêêêêuuêuêxüêùêæyckycêéÿyéèïûwcîæôsïîêæülxûüôqpëïÿeûÿ
+
+[1] ref: à l'aspect d'un monstre d'une grandeur si démesurée le pêcheur voulut prendre
+    hyp: qêûêûêûêûêûêêêkkxsôîæùüébéüêùÿgæyéêpêvûïlüdÿæüflkxjÿékpêùôÿïûïcnlébükêsïÿ
+```
+
+Complete alphabet soup — no recognisable French at all. Interesting that the model has latched onto accented characters (ê, û, ï, ÿ, æ) quite heavily. Possibly because the encoder features for French speech correlate with the accented character space more than plain a-z at this early stage. With CTC, the learning progression is typically: first learn to output the right density of characters and blanks, then learn which characters, then learn word boundaries. We're still in the very early "which characters" phase.

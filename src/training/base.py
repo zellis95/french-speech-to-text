@@ -69,11 +69,15 @@ class BaseTrainer(ABC):
         self.checkpoint_dir = Path("checkpoints")
         self.checkpoint_dir.mkdir(exist_ok=True)
 
-        # W&B (lazy init in train())
+        # W&B (lazy init in train(), controlled by cfg.wandb)
+        self._wandb_enabled = getattr(cfg, "wandb", True)
         self._wandb_run = None
 
     def _init_wandb(self):
-        """Initialize W&B run."""
+        """Initialize W&B run. Skipped if cfg.wandb=false."""
+        if not self._wandb_enabled:
+            log.info("W&B disabled (wandb=false)")
+            return
         import wandb
         from omegaconf import OmegaConf
 
@@ -106,16 +110,31 @@ class BaseTrainer(ABC):
         self._init_wandb()
         train_start = time.time()
 
+        trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        total = sum(p.numel() for p in self.model.parameters())
         log.info(
             f"Starting training: {self.epochs} epochs, "
             f"grad_accum={self.grad_accum_steps}, "
-            f"trainable_params="
-            f"{sum(p.numel() for p in self.model.parameters() if p.requires_grad):,}"
+            f"trainable_params={trainable:,} / {total:,} total"
+        )
+        log.info(f"Device: {self.device}")
+        if self.device == "mps":
+            log.info("  Note: CTC loss falls back to CPU (not supported on MPS)")
+        log.info(
+            f"Data: {len(self.train_loader.dataset)} train, "
+            f"{len(self.val_loader.dataset)} val, "
+            f"batch_size={self.cfg.training.batch_size}"
         )
 
         for epoch in range(1, self.epochs + 1):
             epoch_loss = self._train_epoch(epoch)
             log.info(f"Epoch {epoch}/{self.epochs} — train_loss={epoch_loss:.4f}")
+
+            # Free cached memory between epochs
+            if self.device == "mps":
+                torch.mps.empty_cache()
+            elif self.device == "cuda":
+                torch.cuda.empty_cache()
 
             # Validation
             if epoch % self.val_every_n_epochs == 0:
@@ -136,7 +155,7 @@ class BaseTrainer(ABC):
                         break
 
             # WER/CER evaluation (slower, requires decoding)
-            if epoch % self.wer_eval_every_n_epochs == 0 or epoch == self.epochs:
+            if epoch % self.wer_eval_every_n_epochs == 0:
                 self._evaluate_wer(epoch)
 
         total_time = time.time() - train_start
@@ -150,12 +169,19 @@ class BaseTrainer(ABC):
 
     def _train_epoch(self, epoch: int) -> float:
         """Train for one epoch with gradient accumulation."""
+        from tqdm import tqdm
+
         self.model.train()
         self.optimizer.zero_grad()
         epoch_loss = 0.0
         num_batches = 0
 
-        for batch_idx, batch in enumerate(self.train_loader):
+        pbar = tqdm(
+            self.train_loader,
+            desc=f"Epoch {epoch}/{self.epochs}",
+            leave=True,
+        )
+        for batch_idx, batch in enumerate(pbar):
             step_start = time.time()
 
             # Move batch to device
@@ -180,6 +206,12 @@ class BaseTrainer(ABC):
                 self.optimizer.zero_grad()
                 self.global_step += 1
 
+                # Update progress bar
+                pbar.set_postfix(
+                    loss=f"{loss.item() * self.grad_accum_steps:.4f}",
+                    step=self.global_step,
+                )
+
                 # Logging
                 if self.global_step % self.log_every_n_steps == 0:
                     step_time = time.time() - step_start
@@ -202,13 +234,15 @@ class BaseTrainer(ABC):
 
     def _validate(self, epoch: int) -> float:
         """Run validation, return average loss."""
+        from tqdm import tqdm
+
         self.model.eval()
         total_loss = 0.0
         num_batches = 0
         eval_start = time.time()
 
         with torch.no_grad():
-            for batch in self.val_loader:
+            for batch in tqdm(self.val_loader, desc="Validating", leave=False):
                 batch = self._to_device(batch)
                 loss = self.train_step(batch)
                 total_loss += loss.item()
@@ -230,12 +264,14 @@ class BaseTrainer(ABC):
 
     def _evaluate_wer(self, epoch: int):
         """Run WER/CER evaluation with decoding (slower than validation)."""
+        from tqdm import tqdm
+
         self.model.eval()
         all_predictions = []
         all_references = []
 
         with torch.no_grad():
-            for batch in self.val_loader:
+            for batch in tqdm(self.val_loader, desc="WER eval", leave=False):
                 batch = self._to_device(batch)
                 preds, refs = self.eval_step(batch)
                 all_predictions.extend(preds)
@@ -247,6 +283,13 @@ class BaseTrainer(ABC):
         val_cer = compute_cer(all_references, all_predictions)
 
         log.info(f"  val_wer={val_wer:.4f}, val_cer={val_cer:.4f}")
+
+        # Log sample predictions to console
+        n_samples = min(5, len(all_predictions))
+        for i in range(n_samples):
+            log.info(f"  [sample {i}] ref: {all_references[i][:80]}")
+            log.info(f"  [sample {i}] hyp: {all_predictions[i][:80]}")
+
         self._log_wandb(
             {
                 "val_wer": val_wer,
