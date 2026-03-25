@@ -53,3 +53,30 @@ Loaded the epoch 2 checkpoint and decoded 5 test samples:
 ```
 
 Complete alphabet soup — no recognisable French at all. Interesting that the model has latched onto accented characters (ê, û, ï, ÿ, æ) quite heavily. Possibly because the encoder features for French speech correlate with the accented character space more than plain a-z at this early stage. With CTC, the learning progression is typically: first learn to output the right density of characters and blanks, then learn which characters, then learn word boundaries. We're still in the very early "which characters" phase.
+
+## LLM adapter decode: barely trained adapter output (2026-03-25)
+
+Ran 1 epoch of LLM adapter training (ConcatMLP, 9.7M trainable params) on 103 MLS samples (max_duration=10.5s). Train loss 4.42, val loss 4.44. Only 6 weight updates total (52 batches / 8 grad_accum).
+
+Decoded 5 test samples:
+
+```
+[0] ref: ce discours affligea fort le pêcheur je suis bien malheureux...
+    hyp: ![](https://www.example.com/image1)
+
+[1] ref: schahriar y consentit et scheherazade reprenant son discours...
+    hyp: (empty)
+
+[3] ref: sire répondit la sultane le troisième vieillard raconta son histoire...
+    hyp: anticipated anticipation
+
+[4] ref: il tâcha encore d'apaiser le génie hélas reprit-il daignez avoir...
+    hyp: anticipation anticipation anticipation anticipation anticipation...
+```
+
+The adapter has shifted from the pre-training behaviour (Chinese text / prompt parroting with random weights) to English patterns from Qwen's training data — markdown syntax, English words stuck in loops. Generation behaviour falls into three modes:
+- **Immediate EOS**: model outputs `<|im_end|>` right away → empty string after special token stripping. The LLM just closes the assistant turn without saying anything.
+- **Repetition loops**: gets stuck repeating a word ("anticipation") until hitting max_new_tokens. Common failure mode with barely-trained autoregressive models.
+- **Pretraining artefacts**: markdown image links, random English — the LLM's prior dominates over the weak audio signal from 6 gradient updates.
+
+With proper training (more data, more epochs), the adapter should learn to map audio features to the text embedding space, steering the LLM toward French transcription.
