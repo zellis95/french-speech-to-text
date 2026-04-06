@@ -7,9 +7,7 @@ from num2words import num2words
 
 # CTC charset: 45 classes
 # Index 0 = blank (CTC), 1 = space, 2-27 = a-z, 28-43 = French accented, 44 = apostrophe
-CTC_CHARS = list(
-    " abcdefghijklmnopqrstuvwxyzàâæçéèêëîïôœùûüÿ'"
-)
+CTC_CHARS = list(" abcdefghijklmnopqrstuvwxyzàâæçéèêëîïôœùûüÿ'")
 CTC_BLANK = 0
 CTC_VOCAB_SIZE = len(CTC_CHARS) + 1  # +1 for blank at index 0
 
@@ -32,10 +30,9 @@ _number_re = re.compile(r"\d+(?:[.,]\d+)?")
 _bracketed_re = re.compile(r"\[.*?\]|\(.*?\)|<.*?>")
 
 
-
 def _normalize_apostrophes(text: str) -> str:
     """Normalize all apostrophe variants to standard ASCII apostrophe."""
-    return text.replace("\u2019", "'").replace("\u2018", "'").replace("\u02BC", "'")
+    return text.replace("\u2019", "'").replace("\u2018", "'").replace("\u02bc", "'")
 
 
 def _ordinals_to_words(text: str) -> str:

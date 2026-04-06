@@ -72,6 +72,15 @@ python scripts/train.py mode=local training.lr=5e-5 training.epochs=10
 
 All evaluated on both test sets (MLS scripted + SPS spontaneous) with WER and CER.
 
+### Future Directions
+
+Based on findings from [ByteDance's comprehensive ASR study](https://arxiv.org/abs/2406.17272):
+
+- **Matching loss**: auxiliary loss aligning adapter output embeddings with LLM text embeddings (cross-attention + MSE/cosine), giving the adapter a direct training signal
+- **LoRA fine-tuning**: phased training — first adapter-only (Phase 1), then add LoRA on LLM (Phase 2, nearly free since gradients already flow), optionally LoRA on encoder (Phase 3, more memory)
+- **NSET**: fine-tuning on non-speech audio with empty transcripts to reduce hallucination/repetition
+- **Inference constraints**: n-gram non-repetition + length penalty during beam search
+
 ## Project Structure
 
 ```
@@ -90,3 +99,7 @@ tests/                  Unit tests (pytest)
 
 - **Local** (`mode=local`): MPS backend, MLS `dev` split for training, `test` for validation. Intended for smoke testing and fast iteration — not for producing final results. Swap to `mode=remote` or download the full train split for real training runs.
 - **Remote** (`mode=remote`): Modal serverless GPU (L4/T4), full MLS `train` split pre-cached on Modal Volume, `dev` for validation, W&B logging.
+
+## Status
+
+Training pipeline complete (CTC + LLM adapter, 65 tests passing). Next: Modal POC, data preprocessing optimisation, then run experiments.
