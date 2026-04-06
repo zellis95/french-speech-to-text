@@ -27,19 +27,6 @@ mHuBERT expects: mono 16kHz float32, zero-mean unit-variance normalized. Output:
   - 152 validated clips (non-empty transcription), mono 32kHz mp3, resampled to 16kHz
   - TSV metadata: `ss-corpus-fr.tsv`
 
-## Running
-
-```bash
-# Local dev (uses dev split, ~158MB, cached)
-python scripts/train.py mode=local experiment=ctc_baseline
-
-# Remote (full train on Modal GPU)
-modal run modal_app.py -- mode=remote experiment=llm_adapter adapter=conv_mlp
-
-# Override anything
-python scripts/train.py mode=local training.lr=5e-5
-```
-
 ## Hydra Config Structure
 
 ```
@@ -58,8 +45,18 @@ conf/
 
 - `src/data/text_normalizer.py` — French normalizer + CTC charset (45 classes)
 - `src/data/datasets.py` — MLSDataset (HF parquet), SPSDataset (local TSV+mp3)
+- `src/data/collate.py` — ctc_collate_fn, simple_audio_collate_fn
+- `src/models/encoder.py` — EncoderWrapper (frozen mHuBERT)
+- `src/models/adapters.py` — ConcatMLP, ConvMLP, registry + build_adapter()
+- `src/models/ctc_model.py` — CTCModel (encoder + linear head + CTC loss)
+- `src/models/llm_model.py` — LLMModel (encoder + adapter + frozen Qwen, chat template)
+- `src/training/base.py` — BaseTrainer (shared loop, grad accum, W&B, checkpointing)
+- `src/training/ctc_trainer.py` — CTCTrainer
+- `src/training/llm_trainer.py` — LLMTrainer (inputs_embeds construction)
+- `src/evaluation/metrics.py` — WER/CER via jiwer
+- `src/evaluation/decode.py` — CTC greedy decode, LLM beam search (beam=4)
 - `src/utils/device.py` — CUDA → MPS → CPU auto-detection
-- `tests/test_text_normalizer.py` — 41 tests for normalizer
+- `tests/` — 65 tests (normalizer, adapters, collate, metrics)
 
 ## Environment
 
@@ -78,8 +75,25 @@ conf/
 
 Log interesting findings in `observations.md` — things spotted during development, experiments, unexpected model behaviours, etc.
 
+## Running
+
+```bash
+# Local dev (uses dev split, ~158MB, cached)
+python scripts/train.py mode=local experiment=ctc_baseline
+
+# Remote (full train on Modal GPU)
+modal run modal_app.py -- mode=remote experiment=llm_adapter adapter=conv_mlp
+
+# Override anything
+python scripts/train.py mode=local training.lr=5e-5
+
+# Disable W&B for quick local tests
+python scripts/train.py mode=local wandb=false training.epochs=1
+```
+
 ## Gotchas
 
 - **MLS downloads**: Do NOT use `load_dataset("facebook/multilingual_librispeech", "french", split="dev")` — this downloads ALL splits (~17GB). Use targeted parquet `data_files` approach in `MLSDataset`.
 - **MLS small splits**: `1_hours` and `9_hours` are subsets of train stored in the same parquet shards — they also trigger full train download. Use `dev` for local training instead.
 - **CTC loss on MPS**: Not supported natively. Use `PYTORCH_ENABLE_MPS_FALLBACK=1` or manual CPU fallback.
+- **MPS dtype mismatch**: MPS requires matching dtypes for matmul. Adapter outputs fp32, LLM is fp16 — must cast `inputs_embeds` to fp16 before LLM forward and generate. Handled in `LLMModel.forward()` and `llm_generate()`.
