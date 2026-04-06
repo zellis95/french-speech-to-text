@@ -52,11 +52,14 @@ python scripts/train.py mode=local experiment=ctc_baseline
 # Train LLM adapter locally
 python scripts/train.py mode=local experiment=llm_adapter adapter=concat_mlp
 
-# Train on Modal GPU (full dataset)
-modal run modal_app.py -- mode=remote experiment=llm_adapter adapter=conv_mlp
+# Train on Modal GPU (comma-separated Hydra overrides)
+modal run modal_app.py --overrides "experiment=llm_adapter,training.epochs=5"
 
 # Override any config
 python scripts/train.py mode=local training.lr=5e-5 training.epochs=10
+
+# Quick decode test on a checkpoint
+PYTORCH_ENABLE_MPS_FALLBACK=1 python scripts/quick_decode.py
 ```
 
 ## Experiments
@@ -88,18 +91,19 @@ conf/                   Hydra configs (experiment, adapter, data, training, mode
 src/
 ├── data/               Datasets (MLS, SPS), text normalizer, collate functions
 ├── models/             Encoder, adapters, CTC model, LLM model
-├── training/           Base trainer, CTC trainer, LLM trainer
+├── training/           Base trainer, CTC/LLM trainers, shared run entry points
 ├── evaluation/         WER/CER metrics, decoding
 └── utils/              Device detection
-scripts/                Train, evaluate, inference entry points
+scripts/                Train, evaluate, inference, quick decode
+modal_app.py            Modal serverless GPU entry point
 tests/                  Unit tests (pytest)
 ```
 
 ## Infrastructure
 
 - **Local** (`mode=local`): MPS backend, MLS `dev` split for training, `test` for validation. Intended for smoke testing and fast iteration — not for producing final results. Swap to `mode=remote` or download the full train split for real training runs.
-- **Remote** (`mode=remote`): Modal serverless GPU (L4/T4), full MLS `train` split pre-cached on Modal Volume, `dev` for validation, W&B logging.
+- **Modal** (`modal run modal_app.py`): Serverless GPU (T4 $0.59/hr, L4 $0.80/hr). Checkpoint volume persists across runs. Secrets injected from `.env`. Image cached after first build — source code changes don't trigger rebuild. Currently POC setup (data/models re-downloaded each run). See `CLAUDE.md` for volume commands.
 
 ## Status
 
-Training pipeline complete (CTC + LLM adapter, 65 tests passing). Next: Modal POC, data preprocessing optimisation, then run experiments.
+Training pipeline complete (CTC + LLM adapter, 65 tests passing). Modal POC verified (CTC + LLM training on T4, W&B logging, checkpoint persistence). Next: full Modal setup (data/model volumes, preprocessing), then run experiments.

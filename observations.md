@@ -100,3 +100,25 @@ Still, the progression from Chinese/English to French output is interesting — 
 3. **~38 weight updates** (300 samples, 1 epoch): Mix of English artefacts + French appearing
 
 Memory note: this run hit ~20GB during epoch 2, forcing a kill. Data preprocessing (48kHz→16kHz one-off) is essential before longer training runs on MPS.
+
+## Modal POC: CTC + LLM training on T4 GPU (2026-04-06)
+
+First training runs on Modal serverless GPU (T4, 16GB VRAM). Verified the full pipeline works remotely.
+
+**CTC run** (2 epochs, 46 samples at max_duration=10.2s): Loss 10.75 → 10.75, barely moved. Tiny dataset, too few epochs. 14s total training time.
+
+**LLM run** (3 epochs, 214 samples at max_duration=11.0s): Val loss 4.13 → 3.94 → 3.79, clear learning signal. 9.7M trainable adapter params. 144s total training time. GPU usage peaked at ~4.5GB VRAM, 68% utilisation, ~3GB RAM.
+
+Downloaded the LLM checkpoint and decoded 5 test samples locally:
+
+```
+[0] hyp: ![](http://www.1234567890.com/1234567890/...)    ← markdown URLs (pretraining artefact)
+[1] hyp: 01234567891011121314151617181920...                ← sequential digit counting (new pattern)
+[2] hyp: 60000000000000000000000000000000...                ← degenerate repetition
+```
+
+Same stage as earlier observations: pretraining artefacts dominate, no meaningful audio→text mapping yet. The sequential digit counting is a new failure mode not seen before — the model's found a low-loss pattern of outputting numbers in sequence. Needs significantly more data and epochs to push past this.
+
+**Infrastructure notes**: Image build cached after first run (~158s). Source code mounted at runtime (no rebuild on code changes). Checkpoint volume works — 37MB adapter weights persist correctly. W&B logging confirmed. Total cost for all POC runs: ~$0.15.
+
+**Bug found**: `_save_checkpoint()` was using `v is p` (object identity) to filter trainable params from `state_dict()`. Since `state_dict()` returns detached copies, this was always False — checkpoints were empty dicts (1.3KB). Fixed to use `named_parameters()` key matching.

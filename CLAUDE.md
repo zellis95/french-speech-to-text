@@ -50,12 +50,15 @@ conf/
 - `src/models/adapters.py` — ConcatMLP, ConvMLP, registry + build_adapter()
 - `src/models/ctc_model.py` — CTCModel (encoder + linear head + CTC loss)
 - `src/models/llm_model.py` — LLMModel (encoder + adapter + frozen Qwen, chat template)
+- `src/training/run.py` — Shared training entry points (train_ctc, train_llm, build_dataloaders)
 - `src/training/base.py` — BaseTrainer (shared loop, grad accum, W&B, checkpointing)
 - `src/training/ctc_trainer.py` — CTCTrainer
 - `src/training/llm_trainer.py` — LLMTrainer (inputs_embeds construction)
 - `src/evaluation/metrics.py` — WER/CER via jiwer
 - `src/evaluation/decode.py` — CTC greedy decode, LLM beam search (beam=4)
 - `src/utils/device.py` — CUDA → MPS → CPU auto-detection
+- `modal_app.py` — Modal serverless GPU entry point (T4, Hydra compose, checkpoint volume)
+- `scripts/quick_decode.py` — Ad-hoc checkpoint decode test (load model + decode samples)
 - `tests/` — 65 tests (normalizer, adapters, collate, metrics)
 
 ## Environment
@@ -81,14 +84,32 @@ Log interesting findings in `observations.md` — things spotted during developm
 # Local dev (uses dev split, ~158MB, cached)
 python scripts/train.py mode=local experiment=ctc_baseline
 
-# Remote (full train on Modal GPU)
-modal run modal_app.py -- mode=remote experiment=llm_adapter adapter=conv_mlp
+# Modal GPU (passes Hydra overrides via --overrides, comma-separated)
+modal run modal_app.py --overrides "experiment=llm_adapter,training.epochs=5,data.max_duration_s=11.0"
 
-# Override anything
+# Override anything locally
 python scripts/train.py mode=local training.lr=5e-5
 
 # Disable W&B for quick local tests
 python scripts/train.py mode=local wandb=false training.epochs=1
+```
+
+## Modal
+
+- `modal_app.py` — single entry point: image (debian_slim + uv_sync + ffmpeg), T4 GPU, checkpoint volume
+- Uses `hydra.compose()` to build config (same overrides as CLI), calls `src/training/run.py` directly
+- Base overrides: `mode=local` (dev split). Override anything via `--overrides` flag.
+- Secrets: `Secret.from_dotenv()` injects `.env` vars (HF_TOKEN, WANDB_API_KEY) into container
+- Checkpoint volume: `asr-checkpoints` — persists across runs, accessible via `uv run modal volume ls/get`
+- Image is cached (deps via uv_sync). Source code mounted at runtime — code changes don't trigger rebuild.
+- Resource config: T4 GPU ($0.59/hr), 16GB RAM request, 32GB hard limit
+
+### Modal volume commands
+
+```bash
+uv run modal volume ls asr-checkpoints              # list checkpoints
+uv run modal volume get asr-checkpoints <file> ./checkpoints/ --force  # download
+uv run modal volume rm asr-checkpoints <file>        # delete
 ```
 
 ## Gotchas
