@@ -78,8 +78,9 @@ class BaseTrainer(ABC):
         if not self._wandb_enabled:
             log.info("W&B disabled (wandb=false)")
             return
-        import wandb
         from omegaconf import OmegaConf
+
+        import wandb
 
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in self.model.parameters())
@@ -309,11 +310,10 @@ class BaseTrainer(ABC):
 
     def _save_checkpoint(self, epoch: int, is_best: bool = False):
         """Save trainable parameters only."""
-        trainable_state = {
-            k: v
-            for k, v in self.model.state_dict().items()
-            if any(v is p for p in self.model.parameters() if p.requires_grad)
+        trainable_keys = {
+            name for name, param in self.model.named_parameters() if param.requires_grad
         }
+        trainable_state = {k: v for k, v in self.model.state_dict().items() if k in trainable_keys}
 
         path = self.checkpoint_dir / f"{self.cfg.experiment.name}_epoch{epoch}.pt"
         torch.save(trainable_state, path)
